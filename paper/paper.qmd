@@ -1,0 +1,385 @@
+---
+title: "A Regression Analysis of Baseball Performance Metrics and its Effects on Win Percentage"
+subtitle: "Runs Per Game and ERA are Critical while Stolen Bases and Hits-Against Rate are Minor"
+author: 
+  - Sean Chua
+thanks: "Code and data are available at: [https://github.com/jfhasj/mlb_lahman_analysis](https://github.com/jfhasj/mlb_lahman_analysis)."
+date: today
+date-format: long
+abstract: "This paper examines the factors influencing baseball win percentage through a multiple regression analysis of key performance metrics, such as runs per game, earned run average (ERA), hits against per nine innings, and total stolen bases. Findings reveal that scoring more runs significantly enhances a team's chances of winning, while higher ERA negatively impacts win percentage; interestingly, the effects of hits allowed and stolen bases are comparatively minor. These results highlight the critical importance of offensive production and pitching effectiveness in determining team success in baseball. Understanding these dynamics not only informs team strategies and player evaluations but also contributes to a broader understanding of baseball performance metrics overall."
+format: 
+  pdf:
+    toc: true
+    number-sections: true
+bibliography: references.bib
+---
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+#| echo: false
+
+library(tidyverse)
+library(kableExtra)
+library(arrow)
+library(ggpubr)
+library(modelsummary)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(here)
+library(reshape2)
+library(tinytex)
+library(broom)
+library(tinytable)
+
+library(DiagrammeR)
+library(rsvg)
+library(DiagrammeRsvg)
+library(png)
+```
+
+# Introduction
+
+In the highly competitive landscape of Major League Baseball (MLB), understanding the factors that influence a team's performance is crucial for players, coaches, analysts, and fans alike. Winning percentage serves as a key indicator of a team's success during the regular season, reflecting not only the outcomes of games but also overall team performance and the relationships between key success factors. Thanks to the growth of machine learning and the rise of sports analytics, teams are able to better assess potential outcomes and optimize performance based on available historical and current data. This paper aims to predict MLB teams' winning percentages during the regular season using various performance metrics, including run differential, runs scored per game, earned run average (ERA), hits allowed per game, and stolen bases. 
+
+The primary estimand for this analysis is the predicted winning percentage of each MLB team, which serves as a holistic measure of how well they performed during the regular season. This estimand will be calculated based on historical team data, specifically focusing on the aforementioned variables, that will help estimate the winning percentage of a team given specific values of each variable.
+
+Data from the most recent iteration of the Lahman Baseball Database [@citeLahman] was used, focusing on the Teams table to be able to extract only team statistics. It is worth noting that despite existing research on baseball analytics, more research has been geared toward determining which success factors correlate more or less strongly with a team's winning percentage. In light of this, this paper includes a statistical analysis using data from recent MLB seasons was conducted to build a predictive model for investigating how different aspects of team performance correlate with winning percentage. 
+
+Results show the relatively large impact between the average number of runs scored per game, as well as earned run average (ERA) and winning outcomes, as opposed to the minor impact between the number of hits a team gets against them (per 9 innings), as well as the total number of stolen bases, highlighting the importance of run differential and runs scored per game as primary predictors of success. By examining these dynamics, we aim to illuminate how teams can optimize their performance through effective run production and quality pitching and defense. Ultimately, this analysis seeks to provide valuable insights into the fundamental elements that drive success in baseball. The rest of the paper is structured as follows: @sec-data details the data and measurement process. @sec-model presents the model and justifies the choices made in the building of the chosen model. @sec-results presents the results, highlighting the relationship between different variables and the winning percentage, and @sec-discussion discusses the implications of the findings for this as well as future research in predictive analytics in sports.
+
+# Data {#sec-data}
+
+## Overview
+
+The dataset used for this paper is the most recently released version of the Lahman Baseball Database, first created in 1996 by Sean Lahman, which contains "contains complete batting and pitching statistics back to 1871, plus fielding statistics, standings, team stats, managerial records, postseason data, and more [@lahmandonates].". This dataset offers a comprehensive resource for baseball statistics, serving as an extensive collection of historical data on MLB players, teams, and games. In doing so, the dataset serves as an invaluable tool for analysts, teams, and casual fans alike.
+
+The Lahman Database is only one of many baseball databases, though each of them vary in depth. These include data found on MLB's own website, Baseball Reference, and Retrosheet [@sabr-raw]. Aside from providing pitching, hitting, and fielding data, the Lahman database also includes miscellaneous data such as those about awards, Hall of Fame voting, salaries, All-Star games, and the like. The dataset covers available statistics from the first major league game ever played in 1871 to 2023, the most recent season in which complete data is available. While there are other baseball datasets available, such as the aforementioned Baseball Reference [@baseballReference] and Retrosheet [@retrosheet], the Lahman dataset was selected due to its overall completeness with season data and its ease of use; for the purposes of this analysis, the statistics found in this dataset suffice. Baseball Reference and Retrosheet were not used due to their extreme granularity; Baseball Reference allows for the ability to break statistics down by numerous criteria such as batter handedness, time of day, month, and so on which is not necessary for our purposes. Similarly, the Retrosheet database contains play-by-play data which is not of current interest for this analysis. As such, the aforementioned features of the Lahman database provide a sufficient balance between complexity and convenience.
+
+We use the statistical programming language R [@citeR] to perform data cleaning and analysis on the dataset to ensure consistency and reliability. Team data was filtered to include those from only the 2014, 2017, 2022, and 2023 seasons, as these are seasons where all teams played exactly 162 games. Moreover, the past decade (and the statistics therein) most closely reflects the current state of baseball. It is important to note that the game has evolved significantly over the decades and even within the past few years, resulting in substantial changes in play and strategy.
+
+## Measurement
+
+The process of converting real-world baseball phenomena into data involves careful measurement of team statistics and other performance metrics in the regular season, among many others (such as postseason, all-star, and Hall of Fame data). 
+
+The measurement for this conversion of data, and hence the creation of the overall dataset, is built from a variety of data sources. Lahman has attributed the source of raw data used in his database to statistician Pete Palmer, responsible for numerous baseball encyclopedias published in the past 5 decades. Over the years, Lahman and his team of researchers have constantly maintained and updated the various tables in the database using data from Retrosheet. Note that the database has also undergone various overhauls and redesigns since its inception, and in October 2024, Lahman officially gave the Society of American Baseball Research (SABR) Committee full responsibility of managing his database [@lahmandonates]. Note that prior to Lahman's donation of his database to SABR, many people contributed to the database's updating and management; for example, Lahman acknowledges that "Ted Turocy has done the lion's share of the work to updating the main data tables since 2012" while "the 2023 version of the Lahman Database was updated and generated by Bryan Walko." Consequently, some tables contain missing data as a result of human error, although the Teams table — the table pertintent for this analysis — is not one of them.
+
+Currently, the Lahman database is maintained in a relational database format, with such formats including Microsoft Database files (.mdb) through Microsoft Access, a comma-delimited version (.csv), and MS SQL (.mssql). This variety in file formats allows for flexibility, as well as easy integration with statistical software and other database management systems.
+
+Thus, each entry in the dataset is a result of careful validation, ongoing maintenance, and collaborative efforts by researchers and experts of compiled statistics from various sources. This is then separated into tables within the database, which is then organized into a relational database format, thereby allowing the public to conveniently access and analyze baseball data. This makes it possible to easily examine factors that affect teams' winning percentages.
+
+
+## Outcome Variables
+
+The objective is to predict the outcome variable, `win_pct` which is a continuous variable which takes values between 0 and 1 inclusive. Specifically, `win_pct` indicates a team's winning percentage given a certain amount of wins and losses. The visualization of this outcome variable is presented below:
+
+```{r}
+#| label: fig-winpct-box
+#| fig-cap: Distribution of Team Win Percentage in 2014, 2017, and 2022
+#| fig-pos: "H"
+#| echo: false
+
+clean_data <- read_parquet("../data/02-analysis_data/cleaned_lahman_team_data.parquet")
+win_data <- data.frame(win_pct = clean_data$win_pct, yearID = clean_data$yearID)
+
+# Create a boxplot of win_pct by yearID
+ggplot(win_data, aes(x = as.factor(yearID), y = win_pct, fill = as.factor(yearID))) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(x = "Year",
+       y = "Win Percentage",
+       fill = "Year") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set3")
+```
+@fig-winpct-box illustrates the distribution of team winning percentage in the 2014, 2017. and 2022 regular seasons. We can see that the median winning percentage is relatively stable, hovering slightly lower or above 0.5 (50%) indicating that average teams tend to win about 50% of theur games. However, there are slight discrepancies in the winning percentages of the top 25% and 75% of teams, where the 25th percentile of teams won about 40% and 60% of their games respectively in 2014, while this range in win percentage further increases in 2017 and 2022. This may suggest that there was less and less parity within the MLB through the past few years. This being said, however, we can see that the median team winning percentage is relatively stable over a 162-game MLB regular season.
+
+## Predictor Variables
+**Runs per Game (`runs_per_game`):** This continuous variable indicates the average number of runs a team scores in a game. It is important for analyzing team winning percentage since teams who score more runs tend to win more games (and vice-versa). Adding this variable to our analysis helps in making more accurate predictions about winning percentage, as this serves as one measure of offensive output by a team that contributes to winning games.
+
+**Earned Run Average (`ERA`):** This continuous variable indicates the average number of earned runs given up by a team in a game. It is important for analyzing team winning percentage since teams who give up less runs tend to win more games (and vice-versa). Similar to `runs_per_game`, adding this variable to our analysis helps in making more accurate predictions about winning percentage, as this serves as one measure of the quality of team that contributes to winning games.
+
+**Number of Hits Against per 9 Innings (`HA_9`):** This continuous variable represents the average number of hits given up by a team over the course of 9 innings (the standard length of an MLB game). Similar to `ERA`, this metric is one measure used to evaluate a team's defensive effectiveness. A lower HA_9 indicates better performance, as teams are effectively limiting the number of hits allowed, which go hand-in-hand with giving up less runs.
+
+**Number of Stolen Bases (`SB`):** This discrete variable indicates the total number of stolen bases by a team over the course of the season. Stealing bases increase teams' run-scoring opportunities and so serve as a factor in `runs_per_game`.
+
+```{r}
+#| label: fig-sum1
+#| fig-cap: Distributions and Data for runs_per_game and ERA for the 3 Seasons
+#| fig-pos: "H"
+#| echo: false
+
+# Histogram for runs_per_game
+plot_rpg <- ggplot(clean_data) +
+    geom_histogram(aes(x = runs_per_game), binwidth = .1,
+                   fill = "lightblue", color = "darkblue") +
+    labs(x = "Runs Per Game",
+         y = "Frequency") +
+    theme_minimal()
+
+# Histogram for ERA
+plot_era <- ggplot(clean_data) + 
+  geom_histogram(aes(x = ERA), binwidth = .1,
+                   fill = "lightgreen", color = "darkgreen") +
+    labs(x = "Earned Run Average (ERA)",
+         y = "Frequency") +
+    theme_minimal()
+
+ggarrange(plot_rpg, plot_era, ncol = 2, nrow = 1, labels = c("A", "B"))
+```
+For Plot A in @fig-sum1, the distribution of `runs_per_game` reveals that most teams score between 4 and 5 runs a game, with the mode being about 4.3 runs per game. This suggests that average teams tend to score this amount of runs, with poor-performing and achieving teams scoring closer to an average of about 3.5 and 5.5 runs per game. The concentration of scores in this range indicates a typical performance level for MLB teams, highlighting the competitive nature of scoring.
+
+Plot B in @fig-sum1 presents a histogram of `ERA`, showing that most teams give up between 3.7 and 5 earned runs a game, with significantly fewer teams giving up less than 3 runs or more than 5.5 runs. This distribution underscores the importance of pitching and defense in baseball; teams that can maintain an ERA below 4 are likely to be more competitive. The tails distribution suggest that while exceptional pitching exists, it is relatively rare.
+
+```{r}
+#| label: fig-sum2
+#| fig-cap: Distributions and Data for HA_9 and SB for the 3 Seasons
+#| fig-pos: "H"
+#| echo: false
+
+# Histogram for HA_9
+plot_ha9 <- ggplot(clean_data) +
+    geom_histogram(aes(x = HA_9), binwidth = .5,
+                   fill = "lightcoral", color = "darkred") +
+    labs(x = "Hits Allowed Per Game (HA/9)",
+         y = "Frequency") +
+    theme_minimal()
+
+# Histogram for SB
+plot_sb <- ggplot(clean_data) +
+    geom_histogram(aes(x = SB), binwidth =10,
+                   fill = "lightyellow2", color = "orange") +
+    labs(x = "Stolen Bases",
+         y = "Frequency") +
+    theme_minimal()
+
+ggarrange(plot_ha9, plot_sb, ncol = 2, nrow = 1, labels = c("C", "D"))
+```
+
+Plot C in @fig-sum2 shows the distribution of `HA_9` looks almost like a normal distribution, where a large majority of teams give up between 8 and 9 hits per game, while it is quite rare to give up 7 or 10 hits per game, indicating that these outcomes are outliers in the context of overall team performance.
+
+In @fig-sum2, Plot D illustrates the distribution of `SB` among teams; we see that teams tend to record about 60-110 stolen bases per season. This range highlights a common level of aggressiveness on the base paths among teams, suggesting that stealing bases is a strategic element utilized by many clubs to enhance their offensive capabilities. We notice that very few teams record more than 150 stolen bases; this usually indicates a team having many speedy batters and better base-running strategies.
+
+# Model {#sec-model}
+
+## Overview
+
+This section describes a multiple regression model for predicting teams' win percentages over a typical 162-game MLB season. The model estimates win percentage given several variables — namely average runs scored per game, team ERA, the number of hits against per 9 innings, and the total number of stolen bases — that may or may not significantly affect a team's chances of winning. 
+
+## Model Structure
+
+The model is represented by the following equation:
+
+$$
+\text{predicted\_win\_pct} = \beta_0 + \beta_1 \cdot \text{runs\_per\_game} + \beta_2 \cdot \text{ERA} + \beta_3 \cdot \text{HA\_9} + \beta_4 \cdot \text{SB}
+$$
+
+Here, $\beta_0$, $\beta_1$, $\beta_2$, $\beta_3$, and $\beta_4$ are the model coefficients and are described as follows:
+
+- $\beta_0$ is the intercept or the baseline win percentage
+- $\beta_1$ is the expected increase in win percentage for each additional (average) run scored per game, holding all other variables constant
+- $\beta_2$ is the expected increase in win percentage for each additional unit increase in ERA, holding all other variables constant
+- $\beta_3$ is the expected increase in win percentage for each additional hit allowed per nine innings, holding all other variables constant
+- $\beta_4$ is the expected increase in win percentage for each additional stolen base, holding all other variables constant.
+
+## Model Predictors
+
+- **Runs Per Game (`runs_per_game`):** This metric is a direct measure of a team's offensive effectiveness. Historical data shows that higher scoring teams tend to win more games, making this a critical predictor.
+- **Team ERA (`ERA`):** ERA is a standard measure of pitching effectiveness and was included to assess how well a team prevents runs. Strong pitching is essential for winning games, thus making this variable vital for the model.
+- **Hits Against per 9 Innings (`HA_9`):** This metric measures defensive capabilities and pitching efficiency. Understanding how many hits a team allows can provide insights into overall performance.
+- **Total Stolen Bases (`SB`):** Stolen bases reflect a team’s aggressiveness and ability to capitalize on scoring opportunities. This variable accounts for strategic elements of gameplay that could influence outcomes.
+
+## Assumptions and Limitations
+
+The model assumes that relationship between predictors (runs_per_game, ERA, HA_9, and SB) and the outcome variable (win percentage) is linear. A limitation of the model is that it assumes that the relationships between predictors and win percentage remain constant, but these relationships actually evolve over time due to changes in rules or league dynamics.
+
+## Software Implementation
+
+The model was developed in R [@citeR] using the `tidymodels` [@citetidymodels] package for multiple regression and the extraction of coefficients.
+
+## Model Validation
+
+Model validation and performance metrics ($R^2$ ~ 0.900, $R^2$ Adj. ~ 0.897, RMSE ~ 0.02) are available in `scripts/modeling.R`. These metrics indicate that the model is robust, appropriate for the model’s simplicity and data limitations, and performs well in prediction based on the chosen predictors.
+
+## Alternative Models
+
+Alternative models considered included some machine learning models like neural networks or gradient boosting machines, but these are not easily interpretable and risk overfitting. Additionally, simple linear regression is not suitable for this analysis, as it is too simplistic to generalize well with multiple predictor variables. The final model balances simplicity with predictive accuracy.
+
+## Model Justification
+
+```{r}
+#| label: fig-modeldag
+#| fig-cap: Causal Relationship between Predictor Variables and Win Percentage
+#| fig-pos: "H"
+#| echo: false
+
+# Referenced from: https://github.com/moonsdust/top-songs/blob/main/paper/paper.qmd
+
+causal_model <- "digraph {
+  graph []
+  # Nodes
+  node [shape = plaintext]
+    A [label = 'Win Percentage']
+    B [label = 'Runs Per Game']
+    C [label = 'ERA']
+    D [label = 'Hits Against per 9 Innings']
+    E [label = 'Total Stolen Bases']
+    F [label = 'Rule Changes (Confounder)']
+  
+  # Edges for non-confounding variables
+  edge []
+    B->A
+    C->A
+    D->A
+    E->A
+{ rank = same; }
+
+  # Edges for confounding variable
+  edge [style = dashed]
+    F -> B
+    F -> C
+    F -> D
+    F -> E
+    F -> A
+}"
+
+dag <- grViz(causal_model)
+
+# Export the drawing as a png
+exporting_image <- grViz(causal_model) |>
+  export_svg() |>
+  charToRaw() |>
+  rsvg_png("../other/sketches/baseball_dag.png", width = 1000)
+
+knitr::include_graphics(here::here("other", "sketches", "baseball_dag.png"))
+```
+
+The multiple regression model describes the following causal relationship (@fig-modeldag) where some key performance metrics are able to predict winning percentage, excluding baseball rule changes. Note that we assume that there exists a relationship between these metrics and winning percentage in the frist place. In @fig-modeldag, baseball rule changes serve as a confounding variable since rule changes affect the way baseball is played and the consequent offensive and defensive strategies teams employ, which then have a corresponding impact on the aforementioned variables affecting win percentage over time. However, we are unable to observe the precise effects of such rule changes directly given our data. Limitations such as these, as well as improvements to the model, are discussed in @sec-discussion.
+
+
+# Results {#sec-results}
+
+## Interpretation of Coefficients
+
+The model predicting team win percentage (in 2024) features several coefficients that illustrate the influence of various factors as seen in @tbl-modelsum. The intercept term  $\beta_0$ establishes the baseline win percentage when all predictors are set to zero, serving as a reference for interpreting other coefficients (although this does not have a viable practical interpretation). The values of $\beta_1$ and $\beta_2$ imply that the expected increase in win percentage for each additional (average) run scored per game and additional unit increase in ERA are about 9.3% and -9.3% respectively. An increase of -9.3% is equivalent to a decrease in win percentage of 9.3%. The values of $\beta_3$ and $\beta_4$  show that the expected increase in win percentage for each additional hit a team gets against them (per 9 innings) and additional stolen base are about 0.2% and 0.0% respectively, implying that these two measures may not be significant for team success.
+
+```{r}
+#| label: tbl-modelsum
+#| tbl-cap: Model Summary of Multiple Regression Model
+#| echo: false
+
+win_pct_model <- read_rds(here("models", "win_pct_model.rds")) 
+win_pct_model |> modelsummary()
+```
+
+Furthermore, from @tbl-modelsum we note that the model explains about 90.0% of the total variability in the data, with 89.7% of the variance in `win_pct` explained by the predictor variables included in the model, suggesting strong explanatory power. The effects of `runs_per_game` and `ERA` on  in percentage relatively large compared to that of `HA_9` and `SB`. The very low value of the RMSE provide measures of the model's predictive accuracy and suggests that its predictions are quite accurate.
+
+## Margin of Error on 2024 Data Model Predictions
+
+```{r}
+#| label: fig-predictions-box
+#| fig-cap: Distribution of Actual vs Predicted Team Win Percentage in 2024
+#| fig-pos: "H"
+#| echo: false
+
+library(ggplot2)
+
+data_2024 <- read_parquet(here("data", "2024-data-and-model-predictions", "teams_2024_predictions.parquet"))
+
+data_melted <- melt(data_2024[, c("teamID", "win_pct", "predicted_win_pct")], 
+                    id.vars = "teamID", 
+                    variable.name = "Type", 
+                    value.name = "Percentage")
+
+# Create boxplots to compare win_pct and predicted_win_pct
+ggplot(data_melted, aes(x = Type, y = Percentage)) +
+    geom_boxplot(aes(fill = Type), alpha = .6) +
+    labs(x = NULL,
+         y = "Win Percentage (%)") +
+    theme_minimal() +
+    scale_fill_brewer(palette = "Set3") +
+    theme(
+        legend.position = "none" # Hide legend since it's not needed
+    )
+```
+@fig-predictions-box shows the distribution (using boxplots) of the actual win percentage (`win_pct`) and the win percentage predicted by the model (`predicted_win_pct`). We see that the range of values for `predicted_win_pct` are tighter, and the median win percentage in `predicted_win_pct` is slightly higher than that of `win_pct`. We can delve into these results further by looking at @fig-errors.
+```{r}
+#| label: fig-errors
+#| fig-cap: Distribution of Errors in Actual vs Predicted Team Win Percentage in 2024
+#| fig-pos: "H"
+#| echo: false
+
+# Create a sample data frame based on the provided data
+data_2024 <- read_parquet(here("data", "2024-data-and-model-predictions", "teams_2024_predictions.parquet"))
+
+# Calculate prediction errors
+data_2024_errors <- data_2024 |>
+  mutate(error = win_pct - predicted_win_pct)
+
+# Create a scatter plot of actual vs predicted win percentage
+ggplot(data = data_2024_errors) +
+    geom_bar(aes(x = reorder(teamID, error), y = error), stat = "identity", fill = "steelblue") +
+    coord_flip() + # Flip coordinates for better readability
+    labs(x = "Team",
+         y = "Absolute Error (%)") +
+    theme_minimal()
+```
+
+@fig-errors shows the absolute errors between the actual and predicted win percentage. At first glance, we see that the difference in win percentages range from about -7.4% to about +2.9%. We note that the largest error comes from the Chicago White Sox who had the worst season in the Modern Era (since 1901) [@cws-worst]. Removing this outlier (which can be seen in @fig-predictions-box as well), the range of absolute errors decrease to about -2.94% to +2.9% (the full table can be found in @sec-appendix in @tbl-complete) equivalent to about ±4.7 wins.
+
+In addition, it is interesting to note that along with the almost symmetrical range of absolute errors, @fig-errors shows that the model over-estimates and under-estimates the win percentages of almost the same number of teams (14 and 15 respectively), with only the Arizona Diamondbacks being the only team that the model predicts exactly right (error of 0.002%). This suggests the model is not exhibiting any systemic bias towards consistently over- or under-predicting team performance; the errors appear to be randomly distributed around the true values. This symmetry in errors indicates that the model captures overall trends and relationships in the data reasonably well. However, the fact that there are still notable deviations points to the inherent challenges in predicting the unpredictable nature of baseball performance.
+
+# Discussion {#sec-discussion}
+
+## Runs Per Game and ERA are Highly Important for Winning
+
+From the coefficients in @tbl-modelsum, we can see that run scoring and team ERA highly determine winning percentage. The (absolute) values of `runs_per_game` and `ERA` suggest that improving either run scoring or run prevention  (or both) by can have an relatively great positive impact on a team's expected win percentage. This has important implications for team building and roster construction; it suggests that teams should prioritize investing in offensive talent that can consistently produce runs over the course of a season, as well as developing and acquiring high-quality starting and relief pitchers with low ERA. to maximize a team's winning chances. There do exist factors that affect the number of runs per game and ERA over a season, namely park factors (whether a ballpark is "hitter-friendly" or "pitcher-friendly"), opposing offenses, and the like. However, ERA is ultimately a reflection of a team's defense and overall pitching staff quality.
+
+As a matter of fact, the correlation between `runs_per_game` and `ERA` has been studied for many decades. In an article from the 1976 Baseball Research Journal, we see that using games from 1920-1959, the correlation of the number of runs scored (which is runs_per_game multiplied by the number of games) and ERA to winning percentage was found to be .737 and .743 respectively [@sabr-1976]; note that some rules and the way baseball was played was different then than it is now). Of course, there are many other factors that also contribute to team success, but all in all the dominant influence of runs scored and run prevention, as reflected in @tbl-modelsum, underscores their great importance in determining which teams see the most regular season success. 
+
+## Hits Against per 9 Innings and Stolen Bases are Unimportant
+From @tbl-complete, we can see that the Washington Nationals boast the highest number of stolen bases in 2024, while the Atlanta Braves, with the third-lowest stolen bases, boast an 11% higher win percentage compared to the Nationals. This contrast highlights that while stolen bases can enhance offensive potential, they do not directly translate to wins without effective run conversion. Generally, a lower hits against per nine innings (HA_9) is advantageous, but it doesn't tell the full story; teams must convert those hits into runs, which can be challenging due to factors like double plays and defensive plays. 
+
+For example, take the situation of the 2020 New York Mets. They had the fifth best wRC+ (a statistic which evaluates how effective a team creates runs relative to league average) in MLB history [@foolish-mets]. However, the Mets were statistically worse with runners on base (with offensive production regressing back to about league average). As such, even if they were able to get a lot of hits against teams, they were not able to bring baserunners (and more importantly runners in scoring position) home to actually score runs. It is important to note, however, that teams can still score runs even if they allow fewer hits by utilizing walks, hit-by-pitches (HBP), and other non-hit methods to get runners on base. Additionally, stolen base effectiveness can be influenced by various factors including the catcher's arm strength, pitchers' delivery times, and managerial philosophies (some managers and hitters are more aggressive in their base-stealing tendencies).
+
+## Winning Together: ERA and Scoring Runs are Interdependent
+<!-- So far, from  -->
+<!-- This is corroborated by an article from Samford University, where it states that ___ [@best-stats] -->
+<!-- Discuss the fundamental importance of run scoring in baseball - teams that can consistently outscore their opponents have a clear path to winning more games. Explore how run production is a function of various offensive factors like batting average, power, plate discipline, and baserunning. -->
+
+<!-- The fundamental importance of run scoring in baseball cannot be overstated; teams that consistently outscore their opponents have a clear path to winning more games. This is supported by the Pythagorean Theorem of Baseball, which posits that a team's winning percentage can be predicted based on runs scored and runs allowed. Effective run production is influenced by various offensive factors, including batting average, power, plate discipline, and baserunning. For instance, while Jacob deGrom has often pitched at an elite level with a 1.70 ERA, he has suffered from suboptimal run support, resulting in losses despite his performance. In contrast, Drew Hutchison has garnered wins with a 5.57 ERA due to receiving strong run support from his team. These examples illustrate that while individual pitching performance is critical, it is ultimately the ability to convert opportunities into runs that determines success on the field. -->
+
+## Limitations and Areas for Future Research
+
+\newpage
+
+\appendix
+
+# Appendix {#sec-appendix}
+
+## Additional Tables and Data Details
+```{r}
+#| label: tbl-complete
+#| tbl-cap: 2024 Team Data with Model Predictions
+#| echo: false
+
+data_2024 |> 
+  rename(
+    "Team Name" = teamID,
+    "HA/9" = HA_9,
+    "Runs Per Game" = runs_per_game,
+    "Win %" = win_pct,
+    "Predicted Win %" = predicted_win_pct) |> 
+  kable()
+```
+
+## Additional Model Details (Prediction Error and the Bill James Pythagorean W-L% Formula)
+
+## A Short Discussion on Observational Data and the Lahman Database
+
+# Conclusion
+
+\newpage
+
+# References

@@ -1,0 +1,149 @@
+LLM: Perplexity.
+Date: 15 November 2024
+
+
+User
+I want to download files from a public dropbox link and save them to a directory. The csvs in this directory are in the vector c("AllstarFull.csv","Appearances.csv","AwardsManagers.csv","AwardsPlayers.csv","AwardsShareManagers.csv",
+    "AwardsSharePlayers.csv","Batting.csv","BattingPost.csv","CollegePlaying.csv","Fielding.csv","FieldingOF.csv",
+    "FieldingOFsplit.csv","FieldingPost.csv","HallOfFame.csv","HomeGames.csv","Managers.csv","ManagersHalf.csv",
+    "Parks.csv","People.csv","Pitching.csv","PitchingPost.csv","Salaries.csv","Schools.csv","SeriesPost.csv",
+    "Teams.csv","TeamsFranchises.csv","TeamsHalf.csv")
+Perplexity
+Here's how you can implement this in R:
+# Load necessary library
+if (!requireNamespace("curl", quietly = TRUE)) {
+    install.packages("curl")
+}
+library(curl)
+
+# Define the base URL of the public Dropbox folder (ensure it's modified for direct download)
+base_url <- "https://www.dropbox.com/s/your_folder_link/"  # Replace with your actual link
+dest_dir <- "path/to/your/directory/"  # Specify your desired directory
+
+# Create the destination directory if it doesn't exist
+if (!dir.exists(dest_dir)) {
+    dir.create(dest_dir)
+}
+
+# List of CSV files to download
+csv_files <- c(
+    "AllstarFull.csv",
+    "Appearances.csv",
+    "AwardsManagers.csv",
+    "AwardsPlayers.csv",
+    "AwardsShareManagers.csv",
+    "AwardsSharePlayers.csv",
+    "Batting.csv",
+    "BattingPost.csv",
+    "CollegePlaying.csv",
+    "Fielding.csv",
+    "FieldingOF.csv",
+    "FieldingOFsplit.csv",
+    "FieldingPost.csv",
+    "HallOfFame.csv",
+    "HomeGames.csv",
+    "Managers.csv",
+    "ManagersHalf.csv",
+    "Parks.csv",
+    "People.csv",
+    "Pitching.csv",
+    "PitchingPost.csv",
+    "Salaries.csv",
+    "Schools.csv",
+    "SeriesPost.csv",
+    "Teams.csv",
+    "TeamsFranchises.csv",
+    "TeamsHalf.csv"
+)
+
+# Loop through each file and download it
+for (file_name in csv_files) {
+    # Construct the full URL for each file
+    file_url <- paste0(base_url, file_name, "?dl=1")  # Ensure direct download
+    
+    # Construct the full path for saving the downloaded file
+    dest_file <- file.path(dest_dir, file_name)  # Full path for saving
+
+    # Download the file
+    tryCatch({
+        curl_download(file_url, destfile = dest_file)
+        cat("Downloaded:", file_name, "to", dest_file, "\n")  # Indicate where the file was saved
+    }, error = function(e) {
+        cat("Error downloading", file_name, ":", e$message, "\n")
+    })
+}
+
+
+User
+check for the following using test_that:
+yearID is either 2022 or 2023, lgID is either AL or NL, the following teams are in the AL --- BAL, BOS, CHW, CLE, DET, HOU, KC, LAA, MIN, NYY, OAK, SEA, TB, TEX, TOR --- and the following teams are in the NL --- ARI, ATL, CHC, CIN, COL, LAD, MIA, MIL, NYM, PHI, PIT, SD, SFG, STL, WAS.
+win_pct is between 0 and 1 inclusive and is equal to W/162 rounded to 3 decimal places, W + L = 162, W and L are both non-negative integers, run_diff is any integer, SB is any non-negative integer, runs_per_game and ERA are both non-negative
+Perplexity
+#### Workspace setup ####
+library(tidyverse)
+library(testthat)
+library(arrow)  # Ensure the arrow package is loaded to read parquet files
+
+# Load the cleaned team data from a Parquet file
+team_data <- read_parquet("data/02-analysis_data/cleaned_lahman_team_data.parquet")
+
+# Define the test suite
+test_that("Team Data Validation Tests", {
+  
+  # Check that yearID is either 2022 or 2023
+  expect_true(all(team_data$yearID %in% c(2022, 2023)), 
+              info = "yearID should be either 2022 or 2023")
+  
+  # Check that lgID is either AL or NL
+  expect_true(all(team_data$lgID %in% c("AL", "NL")), 
+              info = "lgID should be either 'AL' or 'NL'")
+  
+  # Define teams in AL and NL
+  al_teams <- c("BAL", "BOS", "CHW", "CLE", "DET", 
+                "HOU", "KC", "LAA", "MIN", 
+                "NYY", "OAK", "SEA", "TB", 
+                "TEX", "TOR")
+  
+  nl_teams <- c("ARI", "ATL", "CHC", "CIN",
+                "COL", "LAD", "MIA", "MIL",
+                "NYM", "PHI", "PIT", "SD",
+                "SFG", "STL", "WAS")
+  
+  # Check that teams are correctly categorized by league
+  expect_true(all(team_data$team_abbrev[team_data$lgID == 'AL'] %in% al_teams), 
+              info = "All AL teams should be in the predefined list")
+  
+  expect_true(all(team_data$team_abbrev[team_data$lgID == 'NL'] %in% nl_teams), 
+              info = "All NL teams should be in the predefined list")
+  
+  # Check that win_pct is between [0-1] and equals W/162 rounded to three decimal places
+  expect_true(all(team_data$win_pct >=0 & team_data$win_pct <=1), 
+              info = "win_pct should be between 0 and 1 inclusive")
+  
+  expect_equal(round(team_data$W / (162), digits=3), round(team_data$win_pct, digits=3), 
+               info = "win_pct should equal W/162 rounded to three decimal places")
+  
+  # Check that W + L equals to games played (162)
+  expect_equal(team_data$W + team_data$L,
+               rep(162, nrow(team_data)), 
+               info = "The sum of W and L should equal 162")
+  
+  # Check that W and L are non-negative integers
+  expect_true(all(team_data$W >=0 & team_data$L >=0), 
+              info = "Wins (W) and Losses (L) should be non-negative integers")
+  
+  # Check that run_diff is any integer
+  expect_true(all(is.integer(team_data$run_diff)), 
+              info = "run_diff should be an integer")
+  
+  # Check that SB is any non-negative integer
+  expect_true(all(team_data$SB >=0 & team_data$SB %% 1 == 0), 
+              info = "SB should be a non-negative integer")
+  
+  # Check that runs_per_game and ERA are both non-negative
+  expect_true(all(team_data$runs_per_game >=0), 
+              info = "runs_per_game should be non-negative")
+  
+  expect_true(all(team_data$ERA >=0), 
+              info = "ERA should be non-negative")
+})
