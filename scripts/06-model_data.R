@@ -79,7 +79,7 @@ predictions_2024 <- predict(model_tidymodels, new_data = teams_2024_cleaned)
 
 # Add predictions as a new column in teams_2024_cleaned
 team_data_2024_predictions <- teams_2024_cleaned  |>
-  mutate(predicted_win_pct = round(predictions_2024$.pred, 5) * 100) # Round if nee
+  mutate(predicted_win_pct = round(predictions_2024$.pred, 5) * 100)
 
 teams_final <- data.frame(
   teamID = team_data_2024_predictions$teamID,
