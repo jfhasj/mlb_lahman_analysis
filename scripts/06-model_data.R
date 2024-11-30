@@ -1,7 +1,7 @@
 #### Preamble ####
 # Purpose: This script models win percentage using team performance metrics from historical data using multiple regression.
 # Author: Sean Eugene Chua
-# Date: 26 November 2024
+# Date: 30 November 2024
 # Contact: seaneugene.chua@mail.utoronto.ca
 # License: None
 # Pre-requisites: Ensure required packages are installed (tidyverse, arrow, here, modelsummary, rvest, dplyr, tidymodels, stringr)
@@ -20,8 +20,8 @@ library(stringr)
 clean_data <- read_parquet(here("data", "02-analysis_data", "cleaned_lahman_team_data.parquet"))
 
 # Fit the linear regression model using tidymodels
-model_tidymodels <- linear_reg() |> 
-  set_engine("lm") |> 
+model_tidymodels <- linear_reg() |>
+  set_engine("lm") |>
   fit(win_pct ~ runs_per_game + ERA + HA_9 + SB, data = clean_data)
 
 # Display the model summary
@@ -46,11 +46,11 @@ team_standard_batting <- extract_table(batting_url, 1)
 team_standard_pitching <- extract_table(pitching_url, 1)
 
 # Filter relevant columns from batting and pitching data
-filtered_batting <- team_standard_batting |> 
-  select(Tm, "R/G", SB) |> 
+filtered_batting <- team_standard_batting |>
+  select(Tm, "R/G", SB) |>
   rename(teamID = Tm, runs_per_game = "R/G")
 
-filtered_pitching <- team_standard_pitching |> 
+filtered_pitching <- team_standard_pitching |>
   select(Tm, ERA = "ERA", win_pct = "W-L%", H9) |>
   rename(teamID = Tm, HA_9 = H9)
 
@@ -78,7 +78,7 @@ write_parquet(teams_2024_cleaned, sink = here("data", "2024-data-and-model-predi
 predictions_2024 <- predict(model_tidymodels, new_data = teams_2024_cleaned)
 
 # Add predictions as a new column in teams_2024_cleaned
-team_data_2024_predictions <- teams_2024_cleaned  |>
+team_data_2024_predictions <- teams_2024_cleaned |>
   mutate(predicted_win_pct = round(predictions_2024$.pred, 5) * 100)
 
 teams_final <- data.frame(

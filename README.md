@@ -23,7 +23,7 @@ Aspects of the code were developed with the assistance of ChatGPT and Perplexity
 To replicate the analysis and run the code in this repository, you'll need to install several R packages. You can install them directly from CRAN using the following command in your R console:
 
 ```R
-install.packages(c("tidyverse", "kableExtra", "arrow", "ggpubr", "modelsummary", "ggplot2", "dplyr", "readr", "here", "reshape2", "rvest", "stringr", "DiagrammeR", "rsvg", "DiagrammeRsvg", "png"))
+install.packages(c("tidyverse", "kableExtra", "arrow", "ggpubr", "modelsummary", "tidymodels", ggplot2", "dplyr", "readr", "here", "reshape2", "rvest", "stringr", "DiagrammeR", "rsvg", "DiagrammeRsvg", "png"))
 ```
 
 ## Data Source

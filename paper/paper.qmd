@@ -25,6 +25,7 @@ library(kableExtra)
 library(arrow)
 library(ggpubr)
 library(modelsummary)
+library(tidymodels)
 library(ggplot2)
 library(dplyr)
 library(readr)
@@ -88,9 +89,11 @@ win_data <- data.frame(win_pct = clean_data$win_pct, yearID = clean_data$yearID)
 # Create a boxplot of win_pct by yearID
 ggplot(win_data, aes(x = as.factor(yearID), y = win_pct, fill = as.factor(yearID))) +
   geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
-  labs(x = "Year",
-       y = "Win Percentage",
-       fill = "Year") +
+  labs(
+    x = "Year",
+    y = "Win Percentage",
+    fill = "Year"
+  ) +
   theme_minimal() +
   scale_fill_brewer(palette = "Set3")
 ```
@@ -113,19 +116,27 @@ ggplot(win_data, aes(x = as.factor(yearID), y = win_pct, fill = as.factor(yearID
 
 # Histogram for runs_per_game
 plot_rpg <- ggplot(clean_data) +
-    geom_histogram(aes(x = runs_per_game), binwidth = .1,
-                   fill = "lightblue", color = "darkblue") +
-    labs(x = "Runs Per Game",
-         y = "Frequency") +
-    theme_minimal()
+  geom_histogram(aes(x = runs_per_game),
+    binwidth = .1,
+    fill = "lightblue", color = "darkblue"
+  ) +
+  labs(
+    x = "Runs Per Game",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 
 # Histogram for ERA
-plot_era <- ggplot(clean_data) + 
-  geom_histogram(aes(x = ERA), binwidth = .1,
-                   fill = "lightgreen", color = "darkgreen") +
-    labs(x = "Earned Run Average (ERA)",
-         y = "Frequency") +
-    theme_minimal()
+plot_era <- ggplot(clean_data) +
+  geom_histogram(aes(x = ERA),
+    binwidth = .1,
+    fill = "lightgreen", color = "darkgreen"
+  ) +
+  labs(
+    x = "Earned Run Average (ERA)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 
 ggarrange(plot_rpg, plot_era, ncol = 2, nrow = 1, labels = c("A", "B"))
 ```
@@ -141,19 +152,27 @@ Plot B in @fig-sum1 presents a histogram of `ERA`, showing that most teams give 
 
 # Histogram for HA_9
 plot_ha9 <- ggplot(clean_data) +
-    geom_histogram(aes(x = HA_9), binwidth = .5,
-                   fill = "lightcoral", color = "darkred") +
-    labs(x = "Hits Allowed Per Game (HA/9)",
-         y = "Frequency") +
-    theme_minimal()
+  geom_histogram(aes(x = HA_9),
+    binwidth = .5,
+    fill = "lightcoral", color = "darkred"
+  ) +
+  labs(
+    x = "Hits Allowed Per Game (HA/9)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 
 # Histogram for SB
 plot_sb <- ggplot(clean_data) +
-    geom_histogram(aes(x = SB), binwidth =10,
-                   fill = "lightyellow2", color = "orange") +
-    labs(x = "Stolen Bases",
-         y = "Frequency") +
-    theme_minimal()
+  geom_histogram(aes(x = SB),
+    binwidth = 10,
+    fill = "lightyellow2", color = "orange"
+  ) +
+  labs(
+    x = "Stolen Bases",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 
 ggarrange(plot_ha9, plot_sb, ncol = 2, nrow = 1, labels = c("C", "D"))
 ```
@@ -227,7 +246,7 @@ causal_model <- "digraph {
     D [label = 'Hits Against per 9 Innings']
     E [label = 'Total Stolen Bases']
     F [label = 'Rule Changes and Salaries (Confounder)']
-  
+
   # Edges for non-confounding variables
   edge []
     B->A
@@ -269,11 +288,31 @@ The model predicting team win percentage (in 2024) features several coefficients
 #| tbl-cap: Model Summary of Multiple Regression Model
 #| echo: false
 
-win_pct_model <- read_rds(here("models", "win_pct_model.rds")) 
+win_pct_model <- read_rds(here("models", "win_pct_model.rds"))
 win_pct_model |> modelsummary()
 ```
 
-Furthermore, from @tbl-modelsum we note that the model explains about 90.0% of the total variability in the data, with 89.7% of the variance in `win_pct` explained by the predictor variables included in the model, suggesting strong explanatory power. The effects of `runs_per_game` and `ERA` on  in percentage relatively large compared to that of `HA_9` and `SB`. The very low value of the RMSE provides measures of the model's predictive accuracy and suggests that its predictions are quite accurate.
+Furthermore, from @tbl-modelsum we note that the model explains about 90.0% of the total variability in the data, with 89.7% of the variance in `win_pct` explained by the predictor variables included in the model, suggesting strong explanatory power. We can also look at the respective $p$-values of each coefficient, and from @tbl-coef below, we can see that assuming our threshold for statistical significance to be 0.05, we see that `runs_per_game` and `ERA` are statistically significant, as their $p$-values are less than 0.05, while those of `HA_9` and `SB` are greater than 0.05, suggesting that `runs_per_game` and `ERA` contribute largely to win percentage relative to `HA_9` and `SB`. In addition, the very low value of the RMSE in @tbl-modelsum provides measures of the model's predictive accuracy and suggests that its predictions are quite accurate.
+
+```{r}
+#| label: tbl-coef
+#| tbl-cap: Table of  Multiple Regression Model Coefficients
+#| echo: false
+
+# Read cleaned data
+clean_data <- read_parquet(here("data", "02-analysis_data", "cleaned_lahman_team_data.parquet"))
+
+# Fit the linear regression model using tidymodels
+model_tidymodels <- linear_reg() |>
+  set_engine("lm") |>
+  fit(win_pct ~ runs_per_game + ERA + HA_9 + SB, data = clean_data)
+
+# Extract model coefficients using tidy
+model_coefficients <- tidy(model_tidymodels)
+
+kable(model_coefficients)
+```
+
 
 ## Margin of Error on 2024 Data Model Predictions
 
@@ -287,21 +326,24 @@ library(ggplot2)
 
 data_2024 <- read_parquet(here("data", "2024-data-and-model-predictions", "teams_2024_predictions.parquet"))
 
-data_melted <- melt(data_2024[, c("teamID", "win_pct", "predicted_win_pct")], 
-                    id.vars = "teamID", 
-                    variable.name = "Type", 
-                    value.name = "Percentage")
+data_melted <- melt(data_2024[, c("teamID", "win_pct", "predicted_win_pct")],
+  id.vars = "teamID",
+  variable.name = "Type",
+  value.name = "Percentage"
+)
 
 # Create boxplots to compare win_pct and predicted_win_pct
 ggplot(data_melted, aes(x = Type, y = Percentage)) +
-    geom_boxplot(aes(fill = Type), alpha = .6) +
-    labs(x = NULL,
-         y = "Win Percentage (%)") +
-    theme_minimal() +
-    scale_fill_brewer(palette = "Set3") +
-    theme(
-        legend.position = "none" # Hide legend since it's not needed
-    )
+  geom_boxplot(aes(fill = Type), alpha = .6) +
+  labs(
+    x = NULL,
+    y = "Win Percentage (%)"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set3") +
+  theme(
+    legend.position = "none" # Hide legend since it's not needed
+  )
 ```
 @fig-predictions-box shows the distribution (using boxplots) of the actual win percentage (`win_pct`) and the win percentage predicted by the model (`predicted_win_pct`). We see that the range of values for `predicted_win_pct` are tighter, and the median win percentage in `predicted_win_pct` is slightly higher than that of `win_pct`. We can delve into these results further by looking at @fig-errors.
 ```{r}
@@ -319,11 +361,13 @@ data_2024_errors <- data_2024 |>
 
 # Create a scatter plot of actual vs predicted win percentage
 ggplot(data = data_2024_errors) +
-    geom_bar(aes(x = reorder(teamID, error), y = error), stat = "identity", fill = "steelblue") +
-    coord_flip() + # Flip coordinates for better readability
-    labs(x = "Team",
-         y = "Absolute Error (%)") +
-    theme_minimal()
+  geom_bar(aes(x = reorder(teamID, error), y = error), stat = "identity", fill = "steelblue") +
+  coord_flip() + # Flip coordinates for better readability
+  labs(
+    x = "Team",
+    y = "Absolute Error (%)"
+  ) +
+  theme_minimal()
 ```
 
 @fig-errors shows the absolute errors between the actual and predicted win percentage. At first glance, we see that the difference in win percentages range from about -7.4% to about +2.9%. We note that the largest error comes from the Chicago White Sox who had the worst season in the Modern Era (since 1901) [@cws-worst]. Removing this outlier, the range of absolute errors decrease to about -2.94% to +2.9% (the full table can be found in @sec-appendix in @tbl-complete) equivalent to about ±4.7 wins.
@@ -375,14 +419,16 @@ Accompanying the paper, a datasheet that contains an in-depth discussion of the 
 #| tbl-cap: 2024 Team Data with Model Predictions
 #| echo: false
 
-data_2024 |> 
+data_2024 |>
   rename(
     "Team Name" = teamID,
     "HA/9" = HA_9,
     "Runs Per Game" = runs_per_game,
     "Win %" = win_pct,
-    "Predicted Win %" = predicted_win_pct) |> 
-  kable() |> kable_styling(font_size = 8.5)
+    "Predicted Win %" = predicted_win_pct
+  ) |>
+  kable() |>
+  kable_styling(font_size = 8.5)
 ```
 
 \newpage
@@ -419,22 +465,25 @@ team_standard_batting <- extract_table(batting_url, 1)
 team_standard_pitching <- extract_table(pitching_url, 1)
 
 # Filter relevant columns from batting and pitching data
-filtered_batting <- team_standard_batting |> 
-  select(Tm, R) |> 
+filtered_batting <- team_standard_batting |>
+  select(Tm, R) |>
   rename(teamID = Tm, "Runs_Scored" = R)
 
-filtered_pitching <- team_standard_pitching |> 
+filtered_pitching <- team_standard_pitching |>
   select(Tm, R, actual_win_pct = "W-L%") |>
   rename(teamID = Tm, "Runs_Against" = R)
 
 # Merge batting and pitching data by team abbreviation
 teams_pyth_2024 <- merge(filtered_pitching, filtered_batting, by = "teamID")
-teams_pyth_2024_no_top <- teams_pyth_2024 |> slice(-1) |> filter(teamID != "Tm" & teamID != "League Average") |> 
+teams_pyth_2024_no_top <- teams_pyth_2024 |>
+  slice(-1) |>
+  filter(teamID != "Tm" & teamID != "League Average") |>
   mutate(
     Runs_Scored = as.numeric(Runs_Scored),
     Runs_Against = as.numeric(Runs_Against),
-    actual_win_pct = as.numeric(actual_win_pct)) |>
-  mutate(pyth_win_pct = (Runs_Scored*Runs_Scored) / (Runs_Scored*Runs_Scored + Runs_Against*Runs_Against))
+    actual_win_pct = as.numeric(actual_win_pct)
+  ) |>
+  mutate(pyth_win_pct = (Runs_Scored * Runs_Scored) / (Runs_Scored * Runs_Scored + Runs_Against * Runs_Against))
 ```
 
 ```{r}
@@ -447,9 +496,16 @@ pyth_final <- data.frame(
   Runs_Scored = teams_pyth_2024_no_top$Runs_Scored,
   Runs_Against = teams_pyth_2024_no_top$Runs_Against,
   actual_win_pct = teams_pyth_2024_no_top$actual_win_pct * 100,
-  pyth_win_pct = teams_pyth_2024_no_top$pyth_win_pct * 100)
-pyth_final |> mutate(win_pct_error = round(actual_win_pct - pyth_win_pct, 4)) |> rename("Runs Scored" = Runs_Scored, "Runs Against" = Runs_Against, 
-                                                                "Actual Win %" = actual_win_pct, "Pythagorean Win %" = pyth_win_pct, "Error" = win_pct_error) |> kable() |> kable_styling(font_size = 8.4)
+  pyth_win_pct = teams_pyth_2024_no_top$pyth_win_pct * 100
+)
+pyth_final |>
+  mutate(win_pct_error = round(actual_win_pct - pyth_win_pct, 4)) |>
+  rename(
+    "Runs Scored" = Runs_Scored, "Runs Against" = Runs_Against,
+    "Actual Win %" = actual_win_pct, "Pythagorean Win %" = pyth_win_pct, "Error" = win_pct_error
+  ) |>
+  kable() |>
+  kable_styling(font_size = 8.4)
 ```
 
 Since we are interested in the distribution of errors, we see @fig-pyth-errors below.
@@ -461,7 +517,7 @@ Since we are interested in the distribution of errors, we see @fig-pyth-errors b
 
 # Create a sample data frame based on the provided data
 data <- teams_pyth_2024_no_top
-data_less <- teams_pyth_2024_no_top |> filter(teamID != "St. Louis Cardinals" & teamID != "Tampa Bay Rays") 
+data_less <- teams_pyth_2024_no_top |> filter(teamID != "St. Louis Cardinals" & teamID != "Tampa Bay Rays")
 
 data <- data |>
   mutate(Win_Error = round(actual_win_pct - pyth_win_pct, 4) * 100)
@@ -470,23 +526,29 @@ data_less <- data_less |>
 
 # Create a scatter plot of actual vs predicted win percentage
 p1 <- ggplot(data) +
-    geom_bar(aes(x = reorder(teamID, Win_Error), y = Win_Error), 
-             stat = "identity", fill = "steelblue") +
-    coord_flip() + # Flip coordinates for better readability
-    labs(x = NULL,  # Set x-axis label to NULL to remove it
-         y = "Win % Error") +
-    theme_minimal() +
-    theme(axis.text.y = element_blank())
+  geom_bar(aes(x = reorder(teamID, Win_Error), y = Win_Error),
+    stat = "identity", fill = "steelblue"
+  ) +
+  coord_flip() + # Flip coordinates for better readability
+  labs(
+    x = NULL, # Set x-axis label to NULL to remove it
+    y = "Win % Error"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank())
 
 # Create the second plot without team names on the side
 p2 <- ggplot(data_less) +
-    geom_bar(aes(x = reorder(teamID, Win_Error), y = Win_Error), 
-             stat = "identity", fill = "steelblue") +
-    coord_flip() + # Flip coordinates for better readability
-    labs(x = NULL,  # Set x-axis label to NULL to remove it
-         y = "Win % Error") +
-    theme_minimal() +
-    theme(axis.text.y = element_blank())
+  geom_bar(aes(x = reorder(teamID, Win_Error), y = Win_Error),
+    stat = "identity", fill = "steelblue"
+  ) +
+  coord_flip() + # Flip coordinates for better readability
+  labs(
+    x = NULL, # Set x-axis label to NULL to remove it
+    y = "Win % Error"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank())
 
 ggarrange(p1, p2, ncol = 2, nrow = 1, labels = c("All", "No Outliers"), font.label = list(size = 12, color = "black"))
 ```
@@ -502,4 +564,3 @@ On the other hand, the reliance on observational data also means that confoundin
 \newpage
 
 # References
-
