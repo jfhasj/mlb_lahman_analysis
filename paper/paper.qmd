@@ -366,7 +366,7 @@ Future research could explore these limitations in several ways. Incorporating a
 # Appendix {#sec-appendix}
 
 ## Datasheet
-Accompanying the paper, a datasheet that contains an in-depth discussion of the nature of the dataset used (i.e. the Lahman Baseball Database) can be found in `other/datasheet/datasheet_lahman.pdf`.
+Accompanying the paper, a datasheet that contains an in-depth discussion of the nature of the Lahman Baseball Database can be found in `other/datasheet/datasheet_lahman.pdf`.
 
 ## Additional Tables and Data Details
 @tbl-complete below shows a complete table containing the outcome variable and predictor variables used for the model in this paper, as well as the model's predictions.
@@ -382,7 +382,7 @@ data_2024 |>
     "Runs Per Game" = runs_per_game,
     "Win %" = win_pct,
     "Predicted Win %" = predicted_win_pct) |> 
-  kable() |> kable_styling(font_size = 9)
+  kable() |> kable_styling(font_size = 8.5)
 ```
 
 \newpage
